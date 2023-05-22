@@ -1,0 +1,542 @@
+```markdown
+# Exercice 1
+
+Pour configurer une instance Elasticsearch avec les paramètres suivants :
+- Nom du noeud : `es-01`
+- Nom du cluster : `magic-system`
+Il faut modifier le fichier elasticsearch.yml de la manière suivante 
+
+node.name: node-1
+cluster.name: my-application
+
+Les options de la JVM sont paramétrés dans le fichier jvm.options situé dans le sous dossier config du dossier elasticsearch
+
+Pour fixer la valeur maximale à 8g il faut écrier la ligne suivante : -Xmx8g
+
+# Exercice 2 
+La méthode utilisée est la méthode PUT avec l'endpoint _bulk 
+
+# Exercice 3 
+# 1.a
+Pour chercher le mot "pomme" dans le champ "description", nous utilisons la requête suivante : 
+
+GET /recettes-test/_search
+{
+  "query": {
+    "match": {
+      "description": "pomme"
+    }
+  }
+}
+
+Nous n'obtenons pas de résultat avec cette requête.
+
+Cela peut être dû à la manière dont le champ description est analysé.
+Pour résoudre ce problème, on pourrait personnalisé l'analyzer.
+
+
+# 2.a
+Nous avons utilisé la requête suivante : 
+
+GET recettes-test/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "author": "Zoé"
+          }
+        },
+        {
+          "range": {
+            "pages": {
+              "lt": 21
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+Et nous obtenons 4 documents :
+ "hits": {
+    "total": {
+      "value": 4,
+      "relation": "eq"
+    }
+ }
+
+# Exercice 4 
+
+## La requête d’ajout de champ au mapping
+
+PUT recettes-test/_mapping
+{
+  "properties": {
+    "theme": {
+      "type": "keyword"
+    }
+  }
+}
+
+## Le type de champ approprié et pourquoi
+
+Le type keyword est plus approprié ici car le thème représente un terme exact qui décrit une caractéristique du document
+
+# Exercice 5
+
+## La requête de création de l’index avec le mapping explicite
+
+PUT /recettes-test_2
+{
+  "mappings": {
+    "properties": {
+      "titre": {
+        "type": "text"
+      },
+      "author": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text"
+      },
+      "publication_date": {
+        "type": "date"
+      },
+      "pages": {
+        "type": "integer"
+      }
+    }
+  }
+}
+
+## La requête de réindexation
+
+POST _reindex
+{
+  "source": {
+    "index": "recettes-test"
+  },
+  "dest": {
+    "index": "recettes-test_2"
+  }
+}
+
+
+# Exercice 6
+
+## Dénombrer le nombre de recettes par auteur, écrites avant 2023.
+
+###  --> Requête
+GET recettes-test/_search
+{
+  "size": 0,
+  "query": {
+    "range": {
+      "publication_date": {
+        "lt": "2023-01-01"
+      }
+    }
+  },
+  "aggs": {
+    "auteurs": {
+      "terms": {
+        "field": "author.keyword",
+        "size": 15
+      }
+    }
+  }
+}
+
+###  --> Résultat 
+
+{
+  "took": 16,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": {
+      "value": 52,
+      "relation": "eq"
+    },
+    "max_score": null,
+    "hits": []
+  },
+  "aggregations": {
+    "auteurs": {
+      "doc_count_error_upper_bound": 0,
+      "sum_other_doc_count": 0,
+      "buckets": [
+        {
+          "key": "Alice",
+          "doc_count": 12
+        },
+        {
+          "key": "Bob",
+          "doc_count": 12
+        },
+        {
+          "key": "Camille",
+          "doc_count": 12
+        },
+        {
+          "key": "Dimitri",
+          "doc_count": 12
+        },
+        {
+          "key": "Zoé",
+          "doc_count": 4
+        }
+      ]
+    }
+  }
+}
+
+## Trouver les moyennes de nombre de pages des recettes de par auteur.
+
+
+###  --> Requête
+
+
+GET recettes-test/_search
+{
+  "size": 0,
+  "aggs": {
+    "auteurs": {
+      "terms": {
+        "field": "author.keyword",
+        "size": 10
+      },
+      "aggs": {
+        "nbr_pages_moyen": {
+          "avg": {
+            "field": "pages"
+          }
+        }
+      }
+    }
+  }
+}
+
+###  --> Résultat
+
+    {
+    "took": 32,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "skipped": 0,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+        "value": 80,
+        "relation": "eq"
+        },
+        "max_score": null,
+        "hits": []
+    },
+    "aggregations": {
+        "auteurs": {
+        "doc_count_error_upper_bound": 0,
+        "sum_other_doc_count": 0,
+        "buckets": [
+            {
+            "key": "Dimitri",
+            "doc_count": 16,
+            "nbr_pages_moyen": {
+                "value": 19
+            }
+            },
+            {
+            "key": "Zoé",
+            "doc_count": 16,
+            "nbr_pages_moyen": {
+                "value": 21.5
+            }
+            },
+            {
+            "key": "Alex",
+            "doc_count": 12,
+            "nbr_pages_moyen": {
+                "value": 25.666666666666668
+            }
+            },
+            {
+            "key": "Alice",
+            "doc_count": 12,
+            "nbr_pages_moyen": {
+                "value": 22.333333333333332
+            }
+            },
+            {
+            "key": "Bob",
+            "doc_count": 12,
+            "nbr_pages_moyen": {
+                "value": 16.666666666666668
+            }
+            },
+            {
+            "key": "Camille",
+            "doc_count": 12,
+            "nbr_pages_moyen": {
+                "value": 26.666666666666668
+            }
+            }
+        ]
+        }
+    }
+    }
+
+# Exercice 7 
+
+## La méthode utilisée pour réindexer
+
+La méthode utilisée pour la réindexation est la méthode POST
+
+## Les requêtes utilisées pour réindexer
+
+PUT recettes-fr
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "french_analyzer": {
+          "type": "standard",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "french_stop",
+            "french_stemmer"
+          ]
+        }
+      },
+      "filter": {
+        "french_stop": {
+          "type": "stop",
+          "stopwords": "_french_"
+        },
+        "french_stemmer": {
+          "type": "stemmer",
+          "language": "light_french"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "analyzer": "french_analyzer"
+      },
+      "author": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "french_analyzer"
+      },
+      "publication_date": {
+        "type": "date"
+      },
+      "pages": {
+        "type": "integer"
+      }
+    }
+  }
+}
+
+
+POST _reindex
+{
+  "source": {
+    "index": "recettes-test"
+  },
+  "dest": {
+    "index": "recettes-fr"
+  }
+}
+
+# Exercice 8 
+
+## Est-ce que le document a pu être indexé ?
+
+Oui le document a pu être indexé
+
+## Requêtes :
+
+POST recettes-fr/_doc
+{
+  "titre": "Gateau aux poires",
+  "author": "Louise",
+  "description": "Le gateau aux poire est moelleux",
+  "publication_date": "2023-05-20",
+  "pages": -20
+}
+
+## Résultat : 
+
+{
+  "_index": "recettes-fr",
+  "_id": "RV1QQIgBZcZnOOt9i5E_",
+  "_version": 1,
+  "result": "created",
+  "_shards": {
+    "total": 2,
+    "successful": 1,
+    "failed": 0
+  },
+  "_seq_no": 85,
+  "_primary_term": 1
+}
+
+## Rechercher les documents dans "recettes-fr” qui contiennent “pomme” dans leur description.
+
+## Requêtes : 
+
+GET recettes-fr/_search
+{
+  "query": {
+    "match": {
+      "description": "pomme"
+    }
+  }
+}
+  
+## Résultat : 
+
+{
+  "took": 21,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": {
+      "value": 0,
+      "relation": "eq"
+    },
+    "max_score": null,
+    "hits": []
+  }
+}
+
+Aucune ligne n'est retournée lors de la recherche du mot "pomme"
+
+# Exercice 9 
+
+## La requête utilisée pour obtenir les tokens
+
+POST _analyze
+{
+  "analyzer": "norwegian",
+  "text": "Jeg elsker klokka åtte-klasser"
+}
+
+## La réponse avec la liste des token
+
+{
+  "tokens": [
+    {
+      "token": "elsk",
+      "start_offset": 4,
+      "end_offset": 10,
+      "type": "<ALPHANUM>",
+      "position": 1
+    },
+    {
+      "token": "klokk",
+      "start_offset": 11,
+      "end_offset": 17,
+      "type": "<ALPHANUM>",
+      "position": 2
+    },
+    {
+      "token": "ått",
+      "start_offset": 18,
+      "end_offset": 22,
+      "type": "<ALPHANUM>",
+      "position": 3
+    },
+    {
+      "token": "klass",
+      "start_offset": 23,
+      "end_offset": 30,
+      "type": "<ALPHANUM>",
+      "position": 4
+    }
+  ]
+}
+
+# Exercice 10
+
+## La requête de création de l’index template
+
+PUT _index_template/recettes_template
+{
+  "index_patterns": ["recettes-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "analysis": {
+        "analyzer": {
+          "default": {
+            "type": "french"
+          }
+        }
+      }
+    },
+   "mappings": {
+    "properties": {
+      "titre": {
+        "type": "text"
+      },
+      "author": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text"
+      },
+      "publication_date": {
+        "type": "date"
+      },
+      "pages": {
+        "type": "integer"
+      }
+    }
+    },
+    "aliases": {
+      "recettes": {}
+    }
+  }
+}
+
+## La requête d’indexation
+
+POST recettes-es/_doc
+{
+  "titre": "Gateau au chocolat",
+  "author": "Lena",
+  "description": "Un gateau moelleux et croquant à la fois",
+  "publication_date": "2023-05-21",
+  "pages": 20
+}
+
+## La requête de vérification
+
+GET _index_template/recettes_template
+
+## La requête qui a permis de compter les documents
+
+GET recettes/_count
